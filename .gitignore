@@ -1,0 +1,16 @@
+# Ignore log files
+phase1/logs/
+
+# Ignore .csv files
+*.csv
+
+# Track some .csv files that hold parameters or info for scripts (as opposed to output)
+# !someParameters.csv
+
+# Ignore other outputs
+modules/output/
+*.pdf
+*.png
+
+# Ignore shell and batch script files:
+executables/

@@ -14,3 +14,6 @@ modules/output/
 
 # Ignore shell and batch script files:
 executables/
+
+# Ignore notes:
+notes/

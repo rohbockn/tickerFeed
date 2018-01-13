@@ -10,6 +10,9 @@
 # Set options
 options(stringsAsFactors=F)
 
+# Script parameters
+block <- 250 # target for each investment size while cash to invest is 'small'
+
 # libraries
 library(lattice)
 
@@ -43,10 +46,6 @@ for (i in tickers) {
   summ <- rbind(summ,tmp)
   rm(tmp)
 }
-
-# Import data on positions
-simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
-liquid <- with(simPos[which(simPos$position=='cash'),],count)
 
 # Get historical baselines:
 # smfn <- function(dat, response, aggvar, smfn) {
@@ -82,8 +81,52 @@ getQuote(tickers,
 eval$ticker <- rownames(eval)
 eval <- merge(eval,hsumm,by='ticker',all=T)
 
-# Identify best candidates for purchase
+# Identify candidates for purchase
+# Look for decrease > threshold
+eval$threshold <- with(eval,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
+eval$flag <- with(eval,Last<threshold)
+eval <- eval[with(eval,order(cvhat,decreasing=T)),]
+
+# Import data on positions
+simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
+liquid <- with(simPos,sum(cash.transaction))
+
+# Calculate target purchase size should a given ticker be chosen
+eval$pcnt <- with(eval,ifelse(flag,yes=floor(block/Last),no=0))
+# Simulate a 'buy'
+for(i in eval$ticker) { # Please add a control to prevent second purchase in existing stake!
+  tmp <- eval[which(eval$ticker==i),]
+  if(tmp$flag) {
+    tmp.timestamp <- Sys.time()
+    tmp.id <- max(simPos$id)+1
+    proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=paste(strftime(tmp.timestamp,format="%F"),tmp.id,sep="_"), type='acquire', price=tmp$Last, cash.transaction=with(tmp,-pcnt*Last))
+    if(proposed$cash.transaction+liquid<0) break()
+    simPos <- rbind(simPos,proposed)
+  }
+  liquid <- with(simPos,sum(cash.transaction))
+}
+
 # Look for price decreases on low volume days.
+eval2 <- merge(simPos, eval, by.x='position', by.y='ticker', all.x=T)
+
+eval2$sell_threshold <- with(eval2,price+1*med.daily.sd)
+eval2$flag_sell <- with(eval2,Last>threshold)
+for(i in eval2$ticker) { # Please add a control to prevent second purchase in existing stake!
+  tmp <- eval2[which(eval2$ticker==i),]
+  if(tmp$flag_sell) {
+    tmp.timestamp <- Sys.time()
+    tmp.id <- max(simPos$id)+1
+    tmp.basis.id <- tmp$basis.id
+    proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=tmp.basis.id,  type='sell', price=tmp$Last, cash.transaction=with(tmp,count*Last))
+    simPos <- rbind(simPos,proposed)
+  }
+}
+
+# Repeat the buy operation, then write simPos to file
+# Consider backing up simPos occasionally
+
+# Write a separate script to gather stats based on all simPos files to evaluate strategies
+
 # Define low volume as
 # Look at decreases > 1 std dev and less than 5% or less than 2 std deviations
 # Look at scatter of hi v lows and superpose lineplot of last 5 days
@@ -95,16 +138,10 @@ smod <- lm(Close ~ -1 + ticker + Open, data=summ)
 # Plot line chart of yesterday to a week previous
 # plot todays open on open axis to current quote on close axis
 
-# Look for decrease > threshold
-eval$threshold <- with(eval,Open-2*med.daily.sd)
-eval$flag <- with(eval,Last<threshold)
+
 # consider restricting trades for single day movement only
 # consider restricting trades for multi-day trends only
 
-# Simulate a 'buy'
-block <- 250
-eval$pcnt <- with(eval,ifelse(flag,yes=floor(block/Last),no=0))
-eval[with(eval,which(flag==TRUE)),c('Last','ticker','pcnt','Trade Time')]
 
 # Identify candidate for sell
 # Look for increase > threshold
@@ -126,25 +163,3 @@ eval[with(eval,which(flag==TRUE)),c('Last','ticker','pcnt','Trade Time')]
 # Track the proportion of times trades result in profits
 # Track the profit/loss of each trade
 # Plot stock price timeline and superpose points on buy and sell dates for visual of how close to local minima/maxima you are
-
-# a = seq(1, 51, by =1)
-#
-# time = index(AMZN)
-# time = time[a]
-# time = format(time, format = "%d.%m.")
-# for (i in 1:3){
-#   assign(paste0(tickers[i], ".1"), Cl(get(tickers[i])))
-# }
-# AMZN.2 = as.numeric(AMZN.1)
-# GOOG.2 = as.numeric(GOOG.1)
-# MSFT.2 = as.numeric(MSFT.1)
-#
-#
-# abc = as.numeric(match("27.10.", time))
-
-# plot(AMZN.2, type = "l", xlab = "time", ylab = "price (USD, NASDAQ)", xaxs = "i", xaxt = "n", main = "Share price Amazon Inc. (Oct 17 - Dec 17)", sub = "qrtly results announced at oct 26th")
-# axis(1,a, labels = time) #a is a numeric vector, time a character vector
-# abline(v = abc, col = "red", lty = "dotted") #abc is a number (=20)
-# abline(h = 972.43, col = "red", lty = "dotted")
-# abline(h = 1100.95, col = "red", lty = "dotted")
-# text(abc, "my text here", col = "red", srt = 90) #abc see above​

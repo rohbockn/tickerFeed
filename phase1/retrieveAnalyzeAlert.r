@@ -17,26 +17,22 @@ libraries <- c("quantmod") # "dygraphs",
 lapply(libraries, function(x) if (!(x %in% installed.packages())) { install.packages(x) })
 lapply(libraries, library, quietly = TRUE, character.only = TRUE)
 
-# Stocks of interest
+# Identify known stocks of interest
 pre.tickers <- read.csv(file="activeTickers.csv",header=T) # c("AMZN","GOOG", "MYGN")
 tickers <- unique(pre.tickers$ticker)
 end <- Sys.Date()
 
+# Retrieve information on known stocks of interest:
+
+# Note, should you desire, you can set different defaults for where ticker info is pulled from:
 # setSymbolLookup(QQQ='yahoo',SPY='google') # If run, getSymbols will get QQQ from yahoo and SPY from google
 
-
-
-#Current ‘src’ methods available are: yahoo, google, MySQL, FRED, csv, RData, oanda, and av.
-
+# For when you want to manually pull from a given source w/o using defaults, use the src arg:
+# Current ‘src’ methods available are: yahoo, google, MySQL, FRED, csv, RData, oanda, and av.
 getSymbols(tickers, from = "2017-10-01", to = end, src='yahoo')
-
 # getSymbols(tickers, from = "2017-10-01", to = end, src='google', return.class="data.frame")
-# getSymbols(tickers, from = "2017-10-01", to = end, src='FRED')
 
-
-# xyplot(MYGN.Open~MYGN.Close, data=data.frame(MYGN))
-
-# Combine ticker data:
+# Consolodate ticker data to facilitate easier analysis:
 summ <- NULL
 for (i in tickers) {
   tmp <- get(i)
@@ -48,10 +44,9 @@ for (i in tickers) {
   rm(tmp)
 }
 
+# Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
 liquid <- with(simPos[which(simPos$position=='cash'),],count)
-
-xyplot(Open~date, groups=summ$ticker, data=summ, type='l')
 
 # Get historical baselines:
 # smfn <- function(dat, response, aggvar, smfn) {
@@ -78,6 +73,8 @@ hsumm$cvhat <- with(hsumm,med.daily.sd/med.mn.daily)
 # hsumm <- merge(hsumm,hsumm22,by='ticker',all=T)
 # hsumm <- merge(hsumm,hsumm23,by='ticker',all=T)
 # hsumm$skewRatio <- with(hsumm, (q75.daily.mn-med.mn.daily)/(med.mn.daily-q25.daily.mn)) # do not use this, calculate each day, then take the median!
+
+# Pull current quotes
 eval <-
 getQuote(tickers,
   what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
@@ -85,8 +82,7 @@ getQuote(tickers,
 eval$ticker <- rownames(eval)
 eval <- merge(eval,hsumm,by='ticker',all=T)
 
-
-# Identify candidate for purchase
+# Identify best candidates for purchase
 # Look for price decreases on low volume days.
 # Define low volume as
 # Look at decreases > 1 std dev and less than 5% or less than 2 std deviations

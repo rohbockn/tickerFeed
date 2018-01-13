@@ -3,7 +3,6 @@ phase1/logs/
 
 # Ignore .csv files
 *.csv
-*.csv#
 
 # Track some .csv files that hold parameters or info for scripts (as opposed to output)
 # !someParameters.csv

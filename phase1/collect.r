@@ -50,7 +50,7 @@ all.tickers <- paste(tickers,collapse=";")
 # getQuote(all.tickers)
 tmp <-
 getQuote(all.tickers,
-  what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)"))
+  what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
 )
 tmp$ticker <- rownames(tmp)
 

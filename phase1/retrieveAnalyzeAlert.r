@@ -73,19 +73,23 @@ hsumm$cvhat <- with(hsumm,med.daily.sd/med.mn.daily)
 # hsumm <- merge(hsumm,hsumm23,by='ticker',all=T)
 # hsumm$skewRatio <- with(hsumm, (q75.daily.mn-med.mn.daily)/(med.mn.daily-q25.daily.mn)) # do not use this, calculate each day, then take the median!
 
-# Pull current quotes
-eval <-
-getQuote(tickers,
-  what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
-)
-eval$ticker <- rownames(eval)
-eval <- merge(eval,hsumm,by='ticker',all=T)
-
-# Identify candidates for purchase
-# Look for decrease > threshold
 eval$threshold <- with(eval,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
 eval$flag.buy <- with(eval,Last<threshold)
 eval <- eval[with(eval,order(cvhat,decreasing=T)),]
+
+# Pull current quotes
+identify <- function(tickers, baseline, strategyFn){
+  eval.obj <-
+    getQuote(tickers,
+      what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
+    )
+  eval.obj$ticker <- rownames(eval)
+  eval.obj <- merge(eval.obj,hsumm,by='ticker',all=T)
+
+  # Identify candidates for purchase
+  evaluated <- strategyFn(eval.obj)
+  return(list(flagged.obj=evaluated))
+}
 
 # Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)

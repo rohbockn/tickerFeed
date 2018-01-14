@@ -76,25 +76,33 @@ benchmark <- function(tickers, from, to){
   return(list(baseline=hsumm))
   }
 
-tactic01 <- function(eval.obj){
+tactAcq01 <- function(eval.obj){
   eval.obj$threshold <- with(eval.obj,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
   eval.obj$flag.buy <- with(eval.obj,Last<threshold)
   eval.obj <- eval.obj[with(eval.obj,order(cvhat,decreasing=T)),]
-  return(eval.obj=eval.obj)
+  return(eval.obj)
+}
+
+tactTurn01 <- function(eval.obj){
+  eval.obj$sell_threshold <- with(eval.obj,price+1*med.daily.sd)
+  eval.obj$flag_sell <- with(eval.obj,Last>threshold)
+  return(eval.obj)
 }
 
 # Pull current quotes
-identify <- function(tickers, baseline, tacticFn){
+identify <- function(tickers, baseline, tactAcqFn, tactTurnFn){
   eval.obj <-
     getQuote(tickers,
       what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
     )
   eval.obj$ticker <- rownames(eval)
-  eval.obj <- merge(eval.obj,baseline,by='ticker',all=T)
+  eval.acq <- merge(eval.obj,baseline,by='ticker',all=T)
+  eval.turn <- merge(position, eval.obj, by.x='position', by.y='ticker', all.x=T)
 
   # Identify candidates for purchase
-  evaluated <- tacticFn(eval.obj)
-  return(list(flagged.obj=evaluated))
+  evaluated.acq <- tactAcqFn(eval.acq)
+  evaluated.turn <- tactTurnFn(eval.turn)
+  return(list(flagged.acq=evaluated.acq, flagged.turn=evaluated.turn))
 }
 
 identify(tickers=tickers, baseline=hsumm, tacticFn=tactic01)
@@ -102,7 +110,7 @@ identify(tickers=tickers, baseline=hsumm, tacticFn=tactic01)
 # Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
 
-propose <- function(position, eval, block.size) {
+proposeAcq <- function(position, eval, block.size) {
   liquid <- with(position,sum(cash.transaction))
 
   # Calculate target purchase size should a given ticker be chosen
@@ -120,25 +128,24 @@ propose <- function(position, eval, block.size) {
     liquid <- with(position,sum(cash.transaction))
   }
 
-    return(list(new.position=position, liquid=liquid))
-  }
+  return(position))
+}
 
-propose(position=simPos, eval=eval, block.size=250)
+proposeAcq(position=simPos, eval=eval, block.size=250)
 
 # Look for price decreases on low volume days.
-eval2 <- merge(simPos, eval, by.x='position', by.y='ticker', all.x=T)
-
-eval2$sell_threshold <- with(eval2,price+1*med.daily.sd)
-eval2$flag_sell <- with(eval2,Last>threshold)
-for(i in eval2$ticker) { # Please add a control to prevent second purchase in existing stake!
-  tmp <- eval2[which(eval2$ticker==i),]
-  if(tmp$flag_sell) {
-    tmp.timestamp <- Sys.time()
-    tmp.id <- max(simPos$id)+1
-    tmp.basis.id <- tmp$basis.id
-    proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=tmp.basis.id,  type='sell', price=tmp$Last, cash.transaction=with(tmp,count*Last))
-    simPos <- rbind(simPos,proposed)
+proposeTurn(position, flagged, block.size){
+  for(i in flagged$ticker) { # Please add a control to prevent second purchase in existing stake!
+    tmp <- flagged[which(flagged$ticker==i),]
+    if(tmp$flag_sell) {
+      tmp.timestamp <- Sys.time()
+      tmp.id <- max(position$id)+1
+      tmp.basis.id <- tmp$basis.id
+      proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=tmp.basis.id,  type='sell', price=tmp$Last, cash.transaction=with(tmp,count*Last))
+      position <- rbind(position,proposed)
+    }
   }
+  return(position)
 }
 
 # Repeat the buy operation, then write simPos to file

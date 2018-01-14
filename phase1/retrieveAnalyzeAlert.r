@@ -32,50 +32,56 @@ end <- Sys.Date()
 
 # For when you want to manually pull from a given source w/o using defaults, use the src arg:
 # Current ‘src’ methods available are: yahoo, google, MySQL, FRED, csv, RData, oanda, and av.
-getSymbols(tickers, from = "2017-10-01", to = end, src='yahoo')
-# getSymbols(tickers, from = "2017-10-01", to = end, src='google', return.class="data.frame")
+benchmark <- function(tickers, from, to){
+  getSymbols(tickers, from = "2017-10-01", to = end, src='yahoo')
+  # getSymbols(tickers, from = "2017-10-01", to = end, src='google', return.class="data.frame")
 
-# Consolodate ticker data to facilitate easier analysis:
-summ <- NULL
-for (i in tickers) {
-  tmp <- get(i)
-  tmp <- as.data.frame(tmp)
-  names(tmp) <- gsub(names(tmp),pattern="^.+\\.(.*)",replacement="\\1")
-  tmp$ticker <- i
-  tmp$date <- as.POSIXct(rownames(tmp))
-  summ <- rbind(summ,tmp)
-  rm(tmp)
+  # Consolodate ticker data to facilitate easier analysis:
+  summ <- NULL
+  for (i in tickers) {
+    tmp <- get(i)
+    tmp <- as.data.frame(tmp)
+    names(tmp) <- gsub(names(tmp),pattern="^.+\\.(.*)",replacement="\\1")
+    tmp$ticker <- i
+    tmp$date <- as.POSIXct(rownames(tmp))
+    summ <- rbind(summ,tmp)
+    rm(tmp)
+  }
+
+  # Get historical baselines:
+  # smfn <- function(dat, response, aggvar, smfn) {
+  #   tmp01 <- with(dat,aggregate(x=list()))
+  # }
+
+  hdat <- read.csv(file='collect.csv',header=T)
+  hdat$Trade.Time <- as.POSIXct(hdat$Trade.Time)
+  hdat$day <- as.POSIXct(strptime(hdat$Trade.Time, format="%F"))
+  hsumm01 <- with(hdat,aggregate(x=list(sd.daily=Last),by=list(day=day,ticker=ticker),FUN=function(x) sd(x,na.rm=T)))
+  hsumm11 <- with(hsumm01,aggregate(x=list(med.daily.sd=sd.daily),by=list(ticker=ticker),FUN=median))
+  # hsumm12 <- with(hsumm01,aggregate(x=list(q25.daily.sd=sd.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.25)))
+  # hsumm13 <- with(hsumm01,aggregate(x=list(q75.daily.sd=sd.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.75)))
+
+  hsumm02 <- with(hdat,aggregate(x=list(mn.daily=Last),by=list(day=day,ticker=ticker),FUN=function(x) mean(x,na.rm=T)))
+  hsumm21 <- with(hsumm02, aggregate(x=list(med.mn.daily=mn.daily),by=list(ticker=ticker),FUN=median))
+  # hsumm22 <- with(hsumm02,aggregate(x=list(q25.daily.mn=mn.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.25)))
+  # hsumm23 <- with(hsumm02,aggregate(x=list(q75.daily.mn=mn.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.75)))
+
+  hsumm <- merge(hsumm11,hsumm21,by='ticker',all=T)
+  hsumm$cvhat <- with(hsumm,med.daily.sd/med.mn.daily)
+  # hsumm <- merge(hsumm,hsumm12,by='ticker',all=T)
+  # hsumm <- merge(hsumm,hsumm13,by='ticker',all=T)
+  # hsumm <- merge(hsumm,hsumm22,by='ticker',all=T)
+  # hsumm <- merge(hsumm,hsumm23,by='ticker',all=T)
+  # hsumm$skewRatio <- with(hsumm, (q75.daily.mn-med.mn.daily)/(med.mn.daily-q25.daily.mn)) # do not use this, calculate each day, then take the median!
+  return(list(baseline=hsumm))
+  }
+
+strat01 <- function(eval.obj){
+  eval.obj$threshold <- with(eval.obj,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
+  eval.obj$flag.buy <- with(eval.obj,Last<threshold)
+  eval.obj <- eval.obj[with(eval.obj,order(cvhat,decreasing=T)),]
+  return(eval.obj=eval.obj)
 }
-
-# Get historical baselines:
-# smfn <- function(dat, response, aggvar, smfn) {
-#   tmp01 <- with(dat,aggregate(x=list()))
-# }
-
-hdat <- read.csv(file='collect.csv',header=T)
-hdat$Trade.Time <- as.POSIXct(hdat$Trade.Time)
-hdat$day <- as.POSIXct(strptime(hdat$Trade.Time, format="%F"))
-hsumm01 <- with(hdat,aggregate(x=list(sd.daily=Last),by=list(day=day,ticker=ticker),FUN=function(x) sd(x,na.rm=T)))
-hsumm11 <- with(hsumm01,aggregate(x=list(med.daily.sd=sd.daily),by=list(ticker=ticker),FUN=median))
-# hsumm12 <- with(hsumm01,aggregate(x=list(q25.daily.sd=sd.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.25)))
-# hsumm13 <- with(hsumm01,aggregate(x=list(q75.daily.sd=sd.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.75)))
-
-hsumm02 <- with(hdat,aggregate(x=list(mn.daily=Last),by=list(day=day,ticker=ticker),FUN=function(x) mean(x,na.rm=T)))
-hsumm21 <- with(hsumm02, aggregate(x=list(med.mn.daily=mn.daily),by=list(ticker=ticker),FUN=median))
-# hsumm22 <- with(hsumm02,aggregate(x=list(q25.daily.mn=mn.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.25)))
-# hsumm23 <- with(hsumm02,aggregate(x=list(q75.daily.mn=mn.daily),by=list(ticker=ticker),FUN=function(x) quantile(x,probs=.75)))
-
-hsumm <- merge(hsumm11,hsumm21,by='ticker',all=T)
-hsumm$cvhat <- with(hsumm,med.daily.sd/med.mn.daily)
-# hsumm <- merge(hsumm,hsumm12,by='ticker',all=T)
-# hsumm <- merge(hsumm,hsumm13,by='ticker',all=T)
-# hsumm <- merge(hsumm,hsumm22,by='ticker',all=T)
-# hsumm <- merge(hsumm,hsumm23,by='ticker',all=T)
-# hsumm$skewRatio <- with(hsumm, (q75.daily.mn-med.mn.daily)/(med.mn.daily-q25.daily.mn)) # do not use this, calculate each day, then take the median!
-
-eval$threshold <- with(eval,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
-eval$flag.buy <- with(eval,Last<threshold)
-eval <- eval[with(eval,order(cvhat,decreasing=T)),]
 
 # Pull current quotes
 identify <- function(tickers, baseline, strategyFn){
@@ -84,12 +90,14 @@ identify <- function(tickers, baseline, strategyFn){
       what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
     )
   eval.obj$ticker <- rownames(eval)
-  eval.obj <- merge(eval.obj,hsumm,by='ticker',all=T)
+  eval.obj <- merge(eval.obj,baseline,by='ticker',all=T)
 
   # Identify candidates for purchase
   evaluated <- strategyFn(eval.obj)
   return(list(flagged.obj=evaluated))
 }
+
+identify(tickers=tickers, baseline=hsumm, strategyFn=strat01)
 
 # Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)

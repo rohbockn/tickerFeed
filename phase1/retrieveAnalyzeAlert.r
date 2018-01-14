@@ -84,27 +84,34 @@ eval <- merge(eval,hsumm,by='ticker',all=T)
 # Identify candidates for purchase
 # Look for decrease > threshold
 eval$threshold <- with(eval,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
-eval$flag <- with(eval,Last<threshold)
+eval$flag.buy <- with(eval,Last<threshold)
 eval <- eval[with(eval,order(cvhat,decreasing=T)),]
 
 # Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
-liquid <- with(simPos,sum(cash.transaction))
 
-# Calculate target purchase size should a given ticker be chosen
-eval$pcnt <- with(eval,ifelse(flag,yes=floor(block/Last),no=0))
-# Simulate a 'buy'
-for(i in eval$ticker) { # Please add a control to prevent second purchase in existing stake!
-  tmp <- eval[which(eval$ticker==i),]
-  if(tmp$flag) {
-    tmp.timestamp <- Sys.time()
-    tmp.id <- max(simPos$id)+1
-    proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=paste(strftime(tmp.timestamp,format="%F"),tmp.id,sep="_"), type='acquire', price=tmp$Last, cash.transaction=with(tmp,-pcnt*Last))
-    if(proposed$cash.transaction+liquid<0) break()
-    simPos <- rbind(simPos,proposed)
+propose <- function(position, eval, block.size) {
+  liquid <- with(position,sum(cash.transaction))
+
+  # Calculate target purchase size should a given ticker be chosen
+  eval$pcnt <- with(eval,ifelse(flag.buy,yes=floor(block.size/Last),no=0))
+  # Simulate a 'buy'
+  for(i in eval$ticker) { # Please add a control to prevent second purchase in existing stake!
+    tmp <- eval[which(eval$ticker==i),]
+    if(tmp$flag) {
+      tmp.timestamp <- Sys.time()
+      tmp.id <- max(position$id)+1
+      proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=paste(strftime(tmp.timestamp,format="%F"),tmp.id,sep="_"), type='acquire', price=tmp$Last, cash.transaction=with(tmp,-pcnt*Last))
+      if(proposed$cash.transaction+liquid<0) break()
+      position <- rbind(position,proposed)
+    }
+    liquid <- with(position,sum(cash.transaction))
   }
-  liquid <- with(simPos,sum(cash.transaction))
-}
+
+    return(list(new.position=position, liquid=liquid))
+  }
+
+propose(position=simPos, eval=eval, block.size=250)
 
 # Look for price decreases on low volume days.
 eval2 <- merge(simPos, eval, by.x='position', by.y='ticker', all.x=T)

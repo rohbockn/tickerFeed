@@ -76,7 +76,7 @@ benchmark <- function(tickers, from, to){
   return(list(baseline=hsumm))
   }
 
-strat01 <- function(eval.obj){
+tactic01 <- function(eval.obj){
   eval.obj$threshold <- with(eval.obj,Open-2*med.daily.sd) # maybe replace open w/predictor from a mod
   eval.obj$flag.buy <- with(eval.obj,Last<threshold)
   eval.obj <- eval.obj[with(eval.obj,order(cvhat,decreasing=T)),]
@@ -84,7 +84,7 @@ strat01 <- function(eval.obj){
 }
 
 # Pull current quotes
-identify <- function(tickers, baseline, strategyFn){
+identify <- function(tickers, baseline, tacticFn){
   eval.obj <-
     getQuote(tickers,
       what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
@@ -93,11 +93,11 @@ identify <- function(tickers, baseline, strategyFn){
   eval.obj <- merge(eval.obj,baseline,by='ticker',all=T)
 
   # Identify candidates for purchase
-  evaluated <- strategyFn(eval.obj)
+  evaluated <- tacticFn(eval.obj)
   return(list(flagged.obj=evaluated))
 }
 
-identify(tickers=tickers, baseline=hsumm, strategyFn=strat01)
+identify(tickers=tickers, baseline=hsumm, tacticFn=tactic01)
 
 # Import data on positions
 simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)

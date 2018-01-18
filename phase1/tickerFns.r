@@ -56,7 +56,7 @@ benchmark <- function(tickers, from, to){
         what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
       )
     eval.obj$ticker <- rownames(eval.obj)
-    browser()
+    # browser()
     eval.acq <- merge(eval.obj,baseline,by='ticker',all=T)
     eval.turn <- merge(position, eval.obj, by.x='position', by.y='ticker', all.x=T)
     eval.turn <- merge(eval.turn,baseline, by.x='position',by.y='ticker',all.x=T)
@@ -67,7 +67,7 @@ benchmark <- function(tickers, from, to){
     return(list(flagged.acq=evaluated.acq, flagged.turn=evaluated.turn))
   }
 
-  proposeAcq <- function(position, eval, block.size) {
+  proposeAcq <- function(position, eval, block.size, repeat=F) {
     liquid <- with(position,sum(cash.transaction))
 
     # Calculate target purchase size should a given ticker be chosen
@@ -80,6 +80,7 @@ benchmark <- function(tickers, from, to){
         tmp.id <- max(position$id)+1
         proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$pcnt, basis.id=paste(strftime(tmp.timestamp,format="%F"),tmp.id,sep="_"), type='acquire', price=tmp$Last, cash.transaction=with(tmp,-pcnt*Last))
         if(proposed$cash.transaction+liquid<0) break()
+        if(!repeat & (proposed$position %in% position$position)) break()
         position <- rbind(position,proposed)
       }
       liquid <- with(position,sum(cash.transaction))

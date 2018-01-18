@@ -13,6 +13,7 @@ tactAcq01 <- function(eval.obj){
 
 tactTurn01 <- function(eval.obj){
   eval.obj$sell_threshold <- with(eval.obj,price+1*med.daily.sd)
-  eval.obj$flag_sell <- with(eval.obj,Last>sell_threshold)
+  eval.obj$stop_loss <- with(eval.obj, Open-3*med.daily.sd)
+  eval.obj$flag_sell <- with(eval.obj,Last>sell_threshold | Last < stop_loss)
   return(eval.obj)
 }

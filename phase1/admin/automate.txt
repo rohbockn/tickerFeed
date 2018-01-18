@@ -1,0 +1,3 @@
+# contents of sh file for cron job to run
+/usr/bin/Rscript --vanilla --verbose <full script path> -w <working directory> <other options> > <working directory>/logs/collect.out 2>&1
+# this is run with a cron job like: */6 7-14 * * 1-5 <path to local repo>/tickerFeed/phase1/executables/collect.sh

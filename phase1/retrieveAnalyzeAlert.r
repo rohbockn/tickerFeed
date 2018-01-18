@@ -19,10 +19,27 @@ block <- 250 # target for each investment size while cash to invest is 'small'
 
 # libraries
 library(lattice)
+library(quantmod)
+library(optparse)
 
-libraries <- c("quantmod") # "dygraphs",
-lapply(libraries, function(x) if (!(x %in% installed.packages())) { install.packages(x) })
-lapply(libraries, library, quietly = TRUE, character.only = TRUE)
+# Structure/document how arguments are to be passed to this script
+option_list = list(
+  make_option(c("-w", "--working_directory"), type="character", default=NULL,
+              help="Path to the base level of the local repository instance", metavar="character"),
+  make_option(c("-s", "--sim_directory"), type="character", default=NULL,
+              help="Path to the simulation directory", metavar="character"),
+  make_option(c("-p", "--position_file"), type="character", default=NULL,
+              help="Path to the simulation directory", metavar="character")
+)
+
+opt_parser = OptionParser(option_list=option_list)
+opt = parse_args(opt_parser)
+
+working.dir <- opt$working_directory
+sim.dir <- file.path(working.dir,opt$sim_directory)
+tmp.positions <- file.path(sim.dir,opt$position_file)
+setwd(working.dir)
+getwd()
 
 # Identify known stocks of interest
 pre.tickers <- read.csv(file="activeTickers.csv",header=T) # c("AMZN","GOOG", "MYGN")
@@ -42,7 +59,7 @@ begin <- Sys.time()-60*60*24*21
 tmp.summ <- benchmark(tickers=tickers, from=begin,to=end)
 
 # Import data on positions
-simPos <- read.csv(file=file.path('sim001',"simPos.csv"),header=T)
+simPos <- read.csv(file=tmp.positions,header=T)
 
 # Pull current quotes
 
@@ -53,9 +70,14 @@ tmp.acq <- proposeAcq(position=simPos, eval=tmp.id$flagged.acq, block.size=250)
 
 # Look for price decreases on low volume days.
 
-tmp.turn <- proposeTurn(position=simPos, flagged=tmp.id$flagged.turn)
+tmp.turn <- proposeTurn(position=tmp.acq, flagged=tmp.id$flagged.turn)
 
 # Repeat the buy operation, then write simPos to file
+
+tmp.acq <- proposeAcq(position=tmp.turn, eval=tmp.id$flagged.acq, block.size=250)
+
+write.csv(x=tmp.acq, file=tmp.positions,row.names=T)
+
 # Consider backing up simPos occasionally
 
 # Make a fn to take obj's from proposeTurn and proposeAcq and write them to

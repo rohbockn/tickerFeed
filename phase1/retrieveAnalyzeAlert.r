@@ -10,10 +10,6 @@
 # Set options
 options(stringsAsFactors=F)
 
-# Source common Fns
-source('tickerFns.r')
-source("tactFns.r")
-
 # Script parameters
 block <- 250 # target for each investment size while cash to invest is 'small'
 
@@ -40,6 +36,10 @@ sim.dir <- file.path(working.dir,opt$sim_directory)
 tmp.positions <- file.path(sim.dir,opt$position_file)
 setwd(working.dir)
 getwd()
+
+# Source common Fns
+source('tickerFns.r')
+source("tactFns.r")
 
 # Identify known stocks of interest
 pre.tickers <- read.csv(file="activeTickers.csv",header=T) # c("AMZN","GOOG", "MYGN")
@@ -129,3 +129,5 @@ write.csv(x=tmp.acq, file=tmp.positions,row.names=T)
 # Track the proportion of times trades result in profits
 # Track the profit/loss of each trade
 # Plot stock price timeline and superpose points on buy and sell dates for visual of how close to local minima/maxima you are
+
+# For positions sold on a stop loss, watch the slope of the position over time to determine when motion is flat-ish for re-making position.

@@ -25,6 +25,8 @@ option_list = list(
   make_option(c("-s", "--sim_directory"), type="character", default=NULL,
               help="Path to the simulation directory", metavar="character"),
   make_option(c("-p", "--position_file"), type="character", default=NULL,
+              help="Path to the simulation directory", metavar="character"),
+  make_option(c("--sell_threshold"), type="numeric", default=1,
               help="Path to the simulation directory", metavar="character")
 )
 
@@ -34,6 +36,7 @@ opt = parse_args(opt_parser)
 working.dir <- opt$working_directory
 sim.dir <- file.path(working.dir,opt$sim_directory)
 tmp.positions <- file.path(sim.dir,opt$position_file)
+tmp.sThreshold <- opt$sell_threshold
 setwd(working.dir)
 getwd()
 
@@ -63,20 +66,24 @@ simPos <- read.csv(file=tmp.positions,header=T)
 
 # Pull current quotes
 
-tmp.id <- identify(tickers=tickers, position=simPos, baseline=tmp.summ$baseline, tactAcqFn=tactAcq01, tactTurnFn=tactTurn01)
+tmp.id <- identify(tickers=tickers, position=simPos, baseline=tmp.summ$baseline, tactAcqFn=tactAcq01, tactTurnFn=tactTurn01, sThreshold=tmp.sThreshold)
 
 
 tmp.acq <- proposeAcq(position=simPos, eval=tmp.id$flagged.acq, block.size=250)
 
 # Look for price decreases on low volume days.
 
-tmp.turn <- proposeTurn(position=tmp.acq, flagged=tmp.id$flagged.turn)
+tmp.id2 <- identify(tickers=unique(na.omit(tmp.acq$position)), position=tmp.acq, baseline=tmp.summ$baseline, tactAcqFn=tactAcq01, tactTurnFn=tactTurn01, sThreshold=tmp.sThreshold)
+
+tmp.turn <- proposeTurn(position=tmp.acq, flagged=tmp.id2$flagged.turn)
 
 # Repeat the buy operation, then write simPos to file
 
-tmp.acq <- proposeAcq(position=tmp.turn, eval=tmp.id$flagged.acq, block.size=250)
+tmp.id3 <- identify(tickers=unique(na.omit(tmp.turn$position)), position=tmp.turn, baseline=tmp.summ$baseline, tactAcqFn=tactAcq01, tactTurnFn=tactTurn01, sThreshold=tmp.sThreshold)
 
-write.csv(x=tmp.acq, file=tmp.positions,row.names=T)
+tmp.acq2 <- proposeAcq(position=tmp.turn, eval=tmp.id3$flagged.acq, block.size=250)
+
+write.csv(x=tmp.acq2, file=tmp.positions,row.names=F)
 
 # Consider backing up simPos occasionally
 

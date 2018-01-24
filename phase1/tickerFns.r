@@ -66,10 +66,10 @@ identify <- function(tickers, baseline, position, tactAcqFn, tactTurnFn, sThresh
       what=yahooQF(c("Open", "Trade Time", "Last Trade (Price Only)","Volume"))
     )
   eval.obj$ticker <- rownames(eval.obj)
-  browser()
+  # browser()
   eval.acq <- merge(eval.obj,baseline,by='ticker',all.x=T)
   eval.turn <- merge(position, eval.obj, by.x='position', by.y='ticker', all.x=T)
-  eval.turn <- merge(eval.turn,baseline, by.x='position',by.y='ticker',all.x=T)
+  eval.turn <- merge(eval.turn,baseline, by.x='position', by.y='ticker', all.x=T)
 
   # eval.acq <- openStatus(eval.acq)
   eval.turn <- openStatus(eval.turn)
@@ -86,7 +86,7 @@ proposeAcq <- function(position, eval, block.size, rpt=F) {
   # Calculate target purchase size should a given ticker be chosen
   eval$count <- with(eval,ifelse(flag_buy,yes=floor(block.size/Last),no=0))
   # Simulate a 'buy'
-  for(i in na.omit(eval$ticker)) { # Please add a control to prevent second purchase in existing stake!
+  for(i in unique(na.omit(eval$ticker))) { # Please add a control to prevent second purchase in existing stake!
     tmp <- eval[which(eval$ticker==i),]
     if(tmp$flag_buy) {
       tmp.timestamp <- as.character(Sys.time())
@@ -94,7 +94,9 @@ proposeAcq <- function(position, eval, block.size, rpt=F) {
       proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$ticker, count=tmp$count, basis.id=paste(strftime(tmp.timestamp,format="%F"),tmp.id,sep="_"), type='acquire', price=tmp$Last, cash.transaction=with(tmp,-count*Last))
       if(proposed$cash.transaction+liquid<0) break()
       if(!rpt & (proposed$position %in% position$position[which(position$closed==0)])) break()
-      position <- rbind(position,proposed)
+      # browser()
+      rt <- c('timestamp','id','position','count','basis.id','type','price','cash.transaction')
+      position <- rbind(position[,rt],proposed[,rt])
     }
     liquid <- with(position,sum(cash.transaction))
     cat('\nLiquid:  ', liquid,'\n\n')
@@ -106,7 +108,7 @@ proposeAcq <- function(position, eval, block.size, rpt=F) {
 proposeTurn <- function(position, flagged, block.size){
   position <- openStatus(position)
   for(i in unique(na.omit(flagged$position))) { # Please add a control to prevent second purchase in existing stake!
-    # browser()
+     # browser()
     tmp <- flagged[which(flagged$position==i & flagged$id==max(flagged$id[which(flagged$position==i)])),]
     tmp2 <- position[which(position$position==i & position$id==max(position$id[which(position$position==i)])),]
     if(tmp$flag_sell & (0 %in% position$closed[which(position$position==i)])) {
@@ -114,7 +116,8 @@ proposeTurn <- function(position, flagged, block.size){
       tmp.id <- max(position$id)+1
       tmp.basis.id <- tmp$basis.id
       proposed <- data.frame(timestamp=tmp.timestamp, id=tmp.id, position=tmp$position, count=tmp2$count, basis.id=tmp.basis.id,  type='sell', price=tmp$Last, cash.transaction=with(tmp,count*Last))
-      position <- rbind(position,proposed)
+      rt <- c('timestamp','id','position','count','basis.id','type','price','cash.transaction')
+      position <- rbind(position[,rt],proposed[,rt])
     }
   }
   return(position)

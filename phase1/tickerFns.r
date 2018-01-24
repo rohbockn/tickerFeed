@@ -101,7 +101,7 @@ proposeAcq <- function(position, eval, block.size, rpt=F) {
     liquid <- with(position,sum(cash.transaction))
     cat('\nLiquid:  ', liquid,'\n\n')
   }
-
+  if('closed' %in% names(position)) position <- position[,-which(names(position)=='closed')]
   return(position)
 }
 
@@ -120,5 +120,6 @@ proposeTurn <- function(position, flagged, block.size){
       position <- rbind(position[,rt],proposed[,rt])
     }
   }
+  if('closed' %in% names(position)) position <- position[,-which(names(position)=='closed')]
   return(position)
 }
